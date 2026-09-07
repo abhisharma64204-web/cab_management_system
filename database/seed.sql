@@ -69,9 +69,9 @@ VALUES
   ('F004','R006','C005','D003', 4,'Decent ride. Knew the routes well.',                '2024-04-11 17:40:00');
 
 -- Verify row counts
-SELECT 'ADMIN'    AS tbl, COUNT(*) AS rows FROM ADMIN    UNION ALL
-SELECT 'CUSTOMER',       COUNT(*)          FROM CUSTOMER UNION ALL
-SELECT 'DRIVER',         COUNT(*)          FROM DRIVER   UNION ALL
-SELECT 'RIDE',           COUNT(*)          FROM RIDE     UNION ALL
-SELECT 'PAYMENT',        COUNT(*)          FROM PAYMENT  UNION ALL
-SELECT 'FEEDBACK',       COUNT(*)          FROM FEEDBACK;
+SELECT 'ADMIN'    AS tbl, COUNT(*) AS `row_count` FROM ADMIN    UNION ALL
+SELECT 'CUSTOMER',       COUNT(*)                 FROM CUSTOMER UNION ALL
+SELECT 'DRIVER',         COUNT(*)                 FROM DRIVER   UNION ALL
+SELECT 'RIDE',           COUNT(*)                 FROM RIDE     UNION ALL
+SELECT 'PAYMENT',        COUNT(*)                 FROM PAYMENT  UNION ALL
+SELECT 'FEEDBACK',       COUNT(*)                 FROM FEEDBACK;

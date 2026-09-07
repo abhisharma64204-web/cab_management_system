@@ -60,12 +60,26 @@ async function runSeed() {
       console.log(`📄 Reading seed data from: ${seedPath}`);
       let seedSql = fs.readFileSync(seedPath, 'utf8');
 
-      // Strip USE statement
-      seedSql = seedSql.replace(/USE [^;]+;/gi, '');
+      // Strip USE statement and any trailing SELECT verification query
+      seedSql = seedSql
+        .replace(/USE [^;]+;/gi, '')
+        .replace(/SELECT\s+'ADMIN'[\s\S]*?;/gi, '');
 
       console.log('🌱 Inserting seed data...');
       await connection.query(seedSql);
       console.log('✅ Seed data inserted successfully.');
+
+      // Print row count summary
+      console.log('\n📊 Database Row Summary:');
+      const tables = ['ADMIN', 'CUSTOMER', 'DRIVER', 'RIDE', 'PAYMENT', 'FEEDBACK'];
+      for (const tbl of tables) {
+        try {
+          const [[result]] = await connection.query(`SELECT COUNT(*) AS count FROM \`${tbl}\``);
+          console.log(`   - ${tbl.padEnd(10)} : ${result.count} rows`);
+        } catch (e) {
+          // table might not exist
+        }
+      }
     } else {
       console.warn(`⚠️ Warning: seed.sql not found at ${seedPath}`);
     }
