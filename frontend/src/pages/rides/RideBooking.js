@@ -77,7 +77,7 @@ export default function RideBooking() {
         </div>
       )}
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 340px', gap:20, maxWidth:1000, margin:'0 auto' }}>
+      <div className="booking-grid">
         {/* Left: form */}
         <div className="card animate-slide">
           <div className="card-title">🗺️ Trip Details</div>
@@ -173,7 +173,7 @@ export default function RideBooking() {
   /* ─── Step 2: Select driver ─── */
   if (step === 2) return (
     <div className="page-container">
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, flexWrap:'wrap', gap:12 }}>
         <div>
           <h1 className="page-title">Select Driver</h1>
           <p className="page-sub">{form.PICKUP_LOC} → {form.DROP_LOC} · {form.DISTANCE}km · <strong style={{ color:'var(--pri)' }}>{formatCurrency(fare)}</strong></p>
@@ -189,10 +189,10 @@ export default function RideBooking() {
           <div key={d.DRIVER_ID}
             onClick={() => setSelectedDriver(d)}
             style={{
-              display:'flex', alignItems:'center', gap:14, padding:18, borderRadius:'var(--radius-md)',
+              display:'flex', alignItems:'center', gap:14, padding:16, borderRadius:'var(--radius-md)',
               cursor:'pointer', border:`2px solid ${selectedDriver?.DRIVER_ID===d.DRIVER_ID ? 'var(--pri)' : 'var(--s200)'}`,
               background: selectedDriver?.DRIVER_ID===d.DRIVER_ID ? 'var(--pri-light)' : '#fff',
-              transition:'all .15s',
+              transition:'all .15s', flexWrap:'wrap',
             }}>
             <Avatar name={d.DRIVER_NAME} size="lg" />
             <div style={{ flex:1 }}>

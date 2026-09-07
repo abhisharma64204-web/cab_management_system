@@ -92,36 +92,31 @@ export default function AdminDashboard() {
   };
 
   const Sidebar = () => (
-    <div style={{ width:210, flexShrink:0, background:'#fff', borderRight:'1px solid var(--s200)', padding:'16px 10px', position:'sticky', top:62, height:'calc(100vh - 62px)', overflowY:'auto' }}>
+    <div className="dashboard-sidebar admin-sidebar">
       <div style={{ fontSize:'0.7rem', fontWeight:700, color:'var(--s400)', textTransform:'uppercase', letterSpacing:'.1em', padding:'2px 10px 8px' }}>Admin Panel</div>
       {TABS.map(t => {
         const icons = { Dashboard:'📊', Rides:'🚖', Drivers:'🚗', Customers:'👥', Payments:'💳', Feedback:'⭐', Reports:'📈' };
         return (
           <button key={t}
             onClick={() => setTab(t)}
-            style={{
-              width:'100%', padding:'9px 12px', borderRadius:'var(--radius)', border:'none',
-              background: tab===t ? 'var(--pri-light)' : 'transparent',
-              color: tab===t ? 'var(--pri)' : 'var(--s600)',
-              fontFamily:"'Outfit',sans-serif", fontSize:'0.88rem', fontWeight: tab===t ? 700 : 500,
-              cursor:'pointer', textAlign:'left', display:'flex', alignItems:'center', gap:9, marginBottom:2,
-              transition:'all .12s',
-            }}>
+            className={`sidebar-btn${tab===t ? ' active' : ''}`}>
             {icons[t]} {t}
           </button>
         );
       })}
-      <div style={{ marginTop:16, padding:'12px 10px', background:'var(--s50)', borderRadius:'var(--radius)', fontSize:'0.78rem', color:'var(--s500)' }}>
-        <div style={{ fontWeight:700, marginBottom:4 }}>🔴 Active Rides</div>
-        <div style={{ fontSize:'1.3rem', fontWeight:900, color:'var(--pri)' }}>{activeRides.length}</div>
+      <div className="sidebar-footer">
+        <div style={{ marginTop:16, padding:'12px 10px', background:'var(--s50)', borderRadius:'var(--radius)', fontSize:'0.78rem', color:'var(--s500)' }}>
+          <div style={{ fontWeight:700, marginBottom:4 }}>🔴 Active Rides</div>
+          <div style={{ fontSize:'1.3rem', fontWeight:900, color:'var(--pri)' }}>{activeRides.length}</div>
+        </div>
       </div>
     </div>
   );
 
   return (
-    <div style={{ display:'flex' }}>
+    <div className="dashboard-layout">
       <Sidebar />
-      <div style={{ flex:1, padding:'24px', overflowY:'auto', minHeight:'calc(100vh - 62px)', background:'var(--s50)' }}>
+      <div className="dashboard-main">
 
         {/* ── DASHBOARD ── */}
         {tab === 'Dashboard' && (

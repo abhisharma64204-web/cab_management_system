@@ -471,3 +471,201 @@ a:hover { text-decoration: underline; }
 .text-small   { font-size: 0.8rem; }
 .text-xs      { font-size: 0.72rem; }
 .truncate     { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ============================================================
+   RESPONSIVE – Navbar
+   ============================================================ */
+.navbar          { display: flex; align-items: center; background: #fff; border-bottom: 1px solid var(--s200); height: 62px; padding: 0 24px; position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow); gap: 8px; }
+.nav-brand       { display: flex; align-items: center; gap: 9px; text-decoration: none; margin-right: 6px; flex-shrink: 0; }
+.nav-brand-icon  { width: 36px; height: 36px; background: var(--pri); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff; font-weight: 900; }
+.nav-brand-text  { font-size: 20px; font-weight: 900; color: var(--s900); }
+.nav-menu        { display: flex; align-items: center; flex: 1; gap: 8px; }
+.nav-links       { display: flex; gap: 2px; flex: 1; }
+.nav-right       { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; }
+.nav-auth        { display: flex; gap: 6px; }
+.nav-hamburger   { display: none; background: none; border: none; font-size: 22px; cursor: pointer; padding: 6px 10px; border-radius: var(--radius); color: var(--s700); margin-left: auto; }
+.nav-hamburger:hover { background: var(--s100); }
+
+/* ============================================================
+   RESPONSIVE – Dashboard Sidebar
+   ============================================================ */
+.dashboard-layout  { display: flex; min-height: calc(100vh - 62px); }
+.dashboard-sidebar {
+  width: 220px; flex-shrink: 0; background: #fff; border-right: 1px solid var(--s200);
+  padding: 20px 10px; position: sticky; top: 62px; height: calc(100vh - 62px);
+  overflow-y: auto; display: flex; flex-direction: column; gap: 4px;
+}
+.dashboard-main    { flex: 1; padding: 24px; background: var(--s50); overflow-y: auto; min-height: calc(100vh - 62px); }
+
+/* Admin sidebar (slightly narrower) */
+.admin-sidebar     { width: 210px; padding: 16px 10px; }
+
+.sidebar-btn {
+  width: 100%; padding: 10px 12px; border-radius: var(--radius); border: none;
+  background: transparent; font-family: 'Outfit', sans-serif; font-size: 0.88rem; font-weight: 500;
+  cursor: pointer; text-align: left; display: flex; align-items: center; gap: 9px;
+  transition: all .12s; color: var(--s600); white-space: nowrap;
+}
+.sidebar-btn.active { background: var(--pri-light); color: var(--pri); font-weight: 700; }
+.sidebar-btn:hover:not(.active) { background: var(--s50); }
+.sidebar-btn-count {
+  margin-left: auto; border-radius: var(--radius-full); font-size: 0.7rem;
+  font-weight: 800; padding: 1px 7px; background: var(--s200); color: var(--s600);
+}
+.sidebar-btn.active .sidebar-btn-count { background: var(--pri); color: #fff; }
+
+/* Sidebar footer (e.g. logout, active rides box) */
+.sidebar-footer    { margin-top: auto; padding-top: 16px; }
+
+/* ============================================================
+   RESPONSIVE – Ride Booking Grid
+   ============================================================ */
+.booking-grid { display: grid; grid-template-columns: 1fr 340px; gap: 20px; max-width: 1000px; margin: 0 auto; }
+
+/* ============================================================
+   RESPONSIVE – Homepage Stats Row
+   ============================================================ */
+.stats-row { display: flex; gap: 48px; justify-content: center; margin-top: 56px; padding-top: 40px; border-top: 1px solid var(--s100); flex-wrap: wrap; }
+
+/* Table wrap touch scroll */
+.table-wrap { -webkit-overflow-scrolling: touch; }
+
+/* ============================================================
+   TABLET  (≤ 768px)
+   ============================================================ */
+@media (max-width: 768px) {
+  /* ── Navbar ── */
+  .nav-hamburger   { display: flex; align-items: center; justify-content: center; }
+  .nav-menu        { display: none; }
+  .navbar.menu-open .nav-menu {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-bottom: 1px solid var(--s200);
+    padding: 14px 18px;
+    box-shadow: var(--shadow-lg);
+    z-index: 99;
+    gap: 12px;
+    animation: slideUp 0.2s ease;
+  }
+  .navbar.menu-open .nav-links {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 4px;
+  }
+  .navbar.menu-open .nav-links .btn {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .navbar.menu-open .nav-right {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+    margin-left: 0;
+    border-top: 1px solid var(--s100);
+    padding-top: 10px;
+  }
+  .navbar.menu-open .nav-auth {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 6px;
+  }
+  .navbar.menu-open .nav-auth .btn,
+  .navbar.menu-open .nav-right .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* ── Dashboard Sidebar → Horizontal Tab Bar ── */
+  .dashboard-layout  { flex-direction: column; }
+  .dashboard-sidebar,
+  .admin-sidebar     {
+    width: 100% !important; height: auto; position: relative; top: 0;
+    flex-direction: row; overflow-x: auto; padding: 8px 12px;
+    border-right: none; border-bottom: 1px solid var(--s200);
+    gap: 4px; -webkit-overflow-scrolling: touch;
+  }
+  .dashboard-sidebar .sidebar-profile { display: none; }
+  .dashboard-sidebar .sidebar-footer  { display: none; }
+  .sidebar-btn { white-space: nowrap; flex-shrink: 0; text-align: center; padding: 8px 14px; font-size: 0.82rem; }
+  .dashboard-main    { padding: 16px 12px; min-height: auto; }
+
+  /* ── Typography ── */
+  h1 { font-size: 1.8rem; }
+  h2 { font-size: 1.4rem; }
+  .page-title { font-size: 1.4rem; }
+  .page-container { padding: 20px 16px; }
+
+  /* ── Stats Grid ── */
+  .stats-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .stat-value { font-size: 1.4rem; }
+
+  /* ── Tables ── */
+  .table th  { padding: 8px 10px; font-size: 0.7rem; }
+  .table td  { padding: 10px 10px; font-size: 0.82rem; }
+
+  /* ── Buttons ── */
+  .btn-xl { padding: 12px 24px; font-size: 1rem; }
+
+  /* ── Booking Grid ── */
+  .booking-grid { grid-template-columns: 1fr; }
+
+  /* ── Stats Row ── */
+  .stats-row { gap: 24px; margin-top: 36px; padding-top: 28px; }
+
+  /* ── Cards ── */
+  .card { padding: 16px; }
+
+  /* ── Modal ── */
+  .modal-box { padding: 20px; border-radius: var(--radius-md); }
+
+  /* ── Page header flex ── */
+  .page-header { flex-wrap: wrap; gap: 12px; }
+}
+
+/* ============================================================
+   MOBILE  (≤ 480px)
+   ============================================================ */
+@media (max-width: 480px) {
+  html { font-size: 13px; }
+  .navbar { padding: 0 14px; height: 56px; }
+  .nav-brand-icon { width: 32px; height: 32px; font-size: 15px; }
+  .nav-brand-text { font-size: 18px; }
+
+  .page-container { padding: 14px 10px; }
+  .page-title { font-size: 1.25rem; }
+
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-card  { padding: 12px 14px; gap: 10px; }
+  .stat-icon  { width: 40px; height: 40px; font-size: 18px; }
+  .stat-value { font-size: 1.2rem; }
+  .stat-label { font-size: 0.72rem; }
+
+  .stats-row { gap: 16px; margin-top: 28px; padding-top: 20px; }
+
+  .card { padding: 14px; }
+  .card-title { font-size: 0.9rem; margin-bottom: 12px; }
+
+  .btn-lg { padding: 10px 20px; font-size: 0.95rem; }
+  .btn-xl { padding: 11px 20px; font-size: 0.95rem; }
+
+  .empty-state { padding: 40px 16px; }
+  .empty-state .icon { font-size: 40px; }
+
+  .tabs { gap: 0; }
+  .tab-btn { padding: 8px 12px; font-size: 0.8rem; }
+
+  .fare-box { padding: 14px; }
+  .fare-row { font-size: 0.82rem; }
+
+  .success-screen { padding: 30px 16px; }
+  .success-icon { font-size: 48px; }
+  .success-title { font-size: 1.2rem; }
+}

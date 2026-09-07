@@ -73,7 +73,7 @@ export default function HomePage() {
           </div>
 
           {/* Stats row */}
-          <div style={{ display:'flex', gap:48, justifyContent:'center', marginTop:56, paddingTop:40, borderTop:'1px solid var(--s100)', flexWrap:'wrap' }}>
+          <div className="stats-row">
             {STATS.map((s, i) => (
               <div key={i} style={{ textAlign:'center' }}>
                 <div style={{ fontSize:'2rem', fontWeight:900, color:'var(--pri)' }}>{s.value}</div>

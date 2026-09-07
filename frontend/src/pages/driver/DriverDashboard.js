@@ -122,11 +122,11 @@ export default function DriverDashboard() {
   );
 
   return (
-    <div style={{ display: 'flex', minHeight: 'calc(100vh - 62px)' }}>
+    <div className="dashboard-layout">
       {/* Sidebar */}
-      <div style={{ width: 220, flexShrink: 0, background: '#fff', borderRight: '1px solid var(--s200)', padding: '20px 10px', position: 'sticky', top: 62, height: 'calc(100vh - 62px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div className="dashboard-sidebar">
         {/* Driver profile mini */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 16px', borderBottom: '1px solid var(--s100)', marginBottom: 6 }}>
+        <div className="sidebar-profile" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 16px', borderBottom: '1px solid var(--s100)', marginBottom: 6 }}>
           <Avatar name={info.DRIVER_NAME} size="md" />
           <div>
             <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--s900)' }}>{info.DRIVER_NAME}</div>
@@ -138,20 +138,14 @@ export default function DriverDashboard() {
           const icons = { 'Active Rides': '🚖', 'Ride History': '📋', 'My Profile': '👤' };
           const cnt   = t === 'Active Rides' ? active.length : t === 'Ride History' ? history.length : null;
           return (
-            <button key={t} onClick={() => setTab(t)} style={{
-              width: '100%', padding: '10px 12px', borderRadius: 'var(--radius)', border: 'none',
-              background: tab === t ? 'var(--pri-light)' : 'transparent',
-              color: tab === t ? 'var(--pri)' : 'var(--s600)',
-              fontFamily: "'Outfit',sans-serif", fontSize: '0.88rem', fontWeight: tab === t ? 700 : 500,
-              cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 9, transition: 'all .12s',
-            }}>
+            <button key={t} onClick={() => setTab(t)} className={`sidebar-btn${tab === t ? ' active' : ''}`}>
               {icons[t]} {t}
-              {cnt != null && <span style={{ marginLeft: 'auto', background: tab === t ? 'var(--pri)' : 'var(--s200)', color: tab === t ? '#fff' : 'var(--s600)', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 800, padding: '1px 7px' }}>{cnt}</span>}
+              {cnt != null && <span className="sidebar-btn-count">{cnt}</span>}
             </button>
           );
         })}
 
-        <div style={{ marginTop: 'auto', paddingTop: 16 }}>
+        <div className="sidebar-footer" style={{ marginTop: 'auto', paddingTop: 16 }}>
           <button className="btn btn-secondary btn-sm btn-full" onClick={() => { logout(); navigate('/'); toast.success('Logged out'); }}>
             🚪 Logout
           </button>
@@ -159,7 +153,7 @@ export default function DriverDashboard() {
       </div>
 
       {/* Main content */}
-      <div style={{ flex: 1, padding: 24, background: 'var(--s50)', overflowY: 'auto' }}>
+      <div className="dashboard-main">
 
         {/* ── ACTIVE RIDES ── */}
         {tab === 'Active Rides' && (

@@ -122,7 +122,7 @@ export default function MyRides() {
           <span>🔍</span>
           <input placeholder="Search by location…" value={query} onChange={e => setQuery(e.target.value)} />
         </div>
-        <div style={{ display:'flex', gap:6 }}>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
           {FILTERS.map(f => (
             <button key={f}
               className={`btn btn-sm${filter===f ? ' btn-primary' : ' btn-secondary'}`}
