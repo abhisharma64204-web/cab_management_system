@@ -56,3 +56,4 @@ services:
           name: cab-management-backend
           property: host
           value: https://${HOST}
+
