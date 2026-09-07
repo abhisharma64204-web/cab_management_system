@@ -1,0 +1,27 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: cabgo-mysql
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    # Use env_file (backend/.env) to supply MYSQL_ROOT_PASSWORD and MYSQL_DATABASE
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./database:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  adminer:
+    image: adminer:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+
+volumes:
+  db_data:
