@@ -1,0 +1,58 @@
+services:
+  # -------------------------------------------------------------
+  # 1. Backend Web Service (Node.js + Express + Socket.io)
+  # -------------------------------------------------------------
+  - type: web
+    name: cab-management-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    preDeployCommand: npm run seed
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: 3306
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        value: cab_management
+      - key: DB_SSL
+        value: true
+      - key: CLIENT_URL
+        fromStaticSite:
+          name: cab-management-frontend
+          property: url
+
+  # -------------------------------------------------------------
+  # 2. Frontend Static Site (React SPA)
+  # -------------------------------------------------------------
+  - type: static
+    name: cab-management-frontend
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    publishPath: build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: REACT_APP_API_URL
+        fromService:
+          type: web
+          name: cab-management-backend
+          property: host
+          value: https://${HOST}/api
+      - key: REACT_APP_SOCKET_URL
+        fromService:
+          type: web
+          name: cab-management-backend
+          property: host
+          value: https://${HOST}

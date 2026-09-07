@@ -11,6 +11,16 @@ CREATE DATABASE cab_management
 
 USE cab_management;
 
+-- Drop existing tables safely if re-initializing
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS FEEDBACK;
+DROP TABLE IF EXISTS PAYMENT;
+DROP TABLE IF EXISTS RIDE;
+DROP TABLE IF EXISTS DRIVER;
+DROP TABLE IF EXISTS CUSTOMER;
+DROP TABLE IF EXISTS ADMIN;
+SET FOREIGN_KEY_CHECKS = 1;
+
 -- -------------------------------------------------------
 -- 1. ADMIN TABLE
 -- -------------------------------------------------------
