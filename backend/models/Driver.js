@@ -5,12 +5,14 @@ const DriverSchema = new mongoose.Schema({
   DRIVER_NAME: { type: String, required: true },
   DRIVER_PHONE: { type: String, required: true, unique: true },
   LICENSE_NO: { type: String, required: true, unique: true },
-  VEHICLE_NO: { type: String, required: true },
   VEHICLE_TYPE: { type: String, required: true },
-  IS_AVAILABLE: { type: Number, default: 1 }, // 1 = Yes, 0 = No
-  IS_VERIFIED: { type: Number, default: 1 },
+  VEHICLE_NO: { type: String, required: true, unique: true },
+  EXPERIENCE: { type: Number, default: 0 },
+  AVAIL_STATUS: { type: String, enum: ['Available', 'Busy', 'Offline'], default: 'Available' },
+  VERIFY_STATUS: { type: String, enum: ['Verified', 'Rejected', 'Pending'], default: 'Verified' }, // Auto-verified for demo convenience
   AVG_RATING: { type: Number, default: 5.0 },
-  REG_DATE: { type: Date, default: Date.now }
+  TOTAL_RIDES: { type: Number, default: 0 },
+  CREATED_AT: { type: Date, default: Date.now }
 });
 
 module.exports = mongoose.model('Driver', DriverSchema);
