@@ -26,6 +26,7 @@ exports.getDashboardStats = async (req, res) => {
       { $group: { _id: null, total: { $sum: '$FARE' } } }
     ]);
 
+    // ✅ Fix: Safely extract values from array index [0]
     const todayRevenue = todayRevenueGroup[0]?.total || 0;
     const totalRevenue = totalRevenueGroup[0]?.total || 0;
 
@@ -56,7 +57,6 @@ exports.getDashboardStats = async (req, res) => {
 // GET /api/reports/daily-trips
 exports.getDailyTripsReport = async (req, res) => {
   try {
-    // Returns last 7 days profile matching structural expectations on frontend charts
     res.json({ success: true, data: [] });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
