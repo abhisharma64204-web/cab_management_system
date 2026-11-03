@@ -3,7 +3,7 @@ const Driver = require('../models/Driver');
 const Ride = require('../models/Ride');
 
 // GET /api/reports/dashboard - Stats summary dashboard layout metrics
-exports.getDashboardStats = async (req, res) => {
+const getDashboardStats = async (req, res) => {
   try {
     // 1. Fetch counts across your collections
     const totalCustomers = await Customer.countDocuments();
@@ -26,15 +26,15 @@ exports.getDashboardStats = async (req, res) => {
       { $group: { _id: null, total: { $sum: '$FARE' } } }
     ]);
 
-    // ✅ Fix: Safely extract values from array index [0]
-    const todayRevenue = todayRevenueGroup[0]?.total || 0;
-    const totalRevenue = totalRevenueGroup[0]?.total || 0;
+    // Safely extract values from array index
+    const todayRevenue = todayRevenueGroup.length > 0 ? todayRevenueGroup[0].total : 0;
+    const totalRevenue = totalRevenueGroup.length > 0 ? totalRevenueGroup[0].total : 0;
 
     // 3. Aggregate driver average ratings safely
     const avgRatingGroup = await Driver.aggregate([
       { $group: { _id: null, avg: { $avg: '$AVG_RATING' } } }
     ]);
-    const platformRating = avgRatingGroup[0]?.avg ? parseFloat(avgRatingGroup[0].avg.toFixed(1)) : 5.0;
+    const platformRating = avgRatingGroup.length > 0 && avgRatingGroup[0].avg ? parseFloat(avgRatingGroup[0].avg.toFixed(1)) : 5.0;
 
     res.json({
       success: true,
@@ -55,7 +55,7 @@ exports.getDashboardStats = async (req, res) => {
 };
 
 // GET /api/reports/daily-trips
-exports.getDailyTripsReport = async (req, res) => {
+const getDailyTripsReport = async (req, res) => {
   try {
     res.json({ success: true, data: [] });
   } catch (err) {
@@ -64,7 +64,7 @@ exports.getDailyTripsReport = async (req, res) => {
 };
 
 // GET /api/reports/revenue-type
-exports.getRevenueByTypeReport = async (req, res) => {
+const getRevenueByTypeReport = async (req, res) => {
   try {
     res.json({ success: true, data: [] });
   } catch (err) {
@@ -73,10 +73,18 @@ exports.getRevenueByTypeReport = async (req, res) => {
 };
 
 // GET /api/reports/top-customers
-exports.getTopCustomersReport = async (req, res) => {
+const getTopCustomersReport = async (req, res) => {
   try {
     res.json({ success: true, data: [] });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
+};
+
+// ✅ Export with explicit names matching exactly what routes/reports.js uses
+module.exports = {
+  getDashboardStats,
+  getDailyTripsReport,
+  getRevenueByTypeReport,
+  getTopCustomersReport
 };
