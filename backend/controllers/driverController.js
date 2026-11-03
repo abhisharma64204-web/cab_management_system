@@ -1,4 +1,8 @@
-const Driver = require('../models/Driver');
+const Driver   = require('../models/Driver');
+const Ride     = require('../models/Ride');
+const Customer = require('../models/Customer');
+const Payment  = require('../models/Payment');
+const Feedback = require('../models/Feedback');
 
 // GET all drivers (with optional dynamic status filtering)
 exports.getAllDrivers = async (req, res) => {
@@ -131,17 +135,21 @@ exports.getAvailableDrivers = async (req, res) => {
 // GET driver earnings analytics aggregate metrics data report
 exports.getDriverEarnings = async (req, res) => {
   try {
-    // Return structured default schema array matching original parameters to safeguard admin tracking views
-    const drivers = await Driver.find().sort({ CREATED_AT: -1 });
-    const formattedData = drivers.map(d => ({
-      DRIVER_ID: d.DRIVER_ID,
-      DRIVER_NAME: d.DRIVER_NAME,
-      VEHICLE_TYPE: d.VEHICLE_TYPE,
-      AVG_RATING: d.AVG_RATING,
-      TOTAL_RIDES: d.TOTAL_RIDES || 0,
-      completed_rides: 0,
-      total_earnings: 0,
-      avg_fare: 0
+    const drivers = await Driver.find().sort({ CREATED_AT: -1 }).lean();
+    const formattedData = await Promise.all(drivers.map(async (d) => {
+      const completedRides = await Ride.find({ DRIVER_ID: d.DRIVER_ID, RIDE_STATUS: 'Completed' }).lean();
+      const total_earnings = completedRides.reduce((sum, r) => sum + Number(r.FARE || 0), 0);
+      const avg_fare = completedRides.length > 0 ? Math.round(total_earnings / completedRides.length) : 0;
+      return {
+        DRIVER_ID:       d.DRIVER_ID,
+        DRIVER_NAME:     d.DRIVER_NAME,
+        VEHICLE_TYPE:    d.VEHICLE_TYPE,
+        AVG_RATING:      d.AVG_RATING,
+        TOTAL_RIDES:     d.TOTAL_RIDES || 0,
+        completed_rides: completedRides.length,
+        total_earnings,
+        avg_fare,
+      };
     }));
     res.json({ success: true, data: formattedData });
   } catch (err) {
@@ -179,11 +187,27 @@ exports.loginDriver = async (req, res) => {
   }
 };
 
-// GET active/past rides assigned to a specific driver tracking log
+// GET active/past rides assigned to a specific driver
 exports.getDriverRides = async (req, res) => {
   try {
-    // Return empty collection mapping format safely to prevent map loop execution breaks on client layouts
-    res.json({ success: true, data: [] });
+    const rides = await Ride.find({ DRIVER_ID: req.params.id }).sort({ REQUEST_TIME: -1 }).lean();
+
+    const enriched = await Promise.all(rides.map(async (ride) => {
+      const cust     = await Customer.findOne({ CUST_ID: ride.CUST_ID })
+                             .select('CUST_NAME CUST_PHONE').lean();
+      const payment  = await Payment.findOne({ RIDE_ID: ride.RIDE_ID }).lean();
+      const feedback = await Feedback.findOne({ RIDE_ID: ride.RIDE_ID }).lean();
+      return {
+        ...ride,
+        CUST_NAME:      cust?.CUST_NAME      || '',
+        CUST_PHONE:     cust?.CUST_PHONE     || '',
+        PAYMENT_STATUS: payment?.PAYMENT_STATUS || null,
+        RATING:         feedback?.RATING        || null,
+        COMMENTS:       feedback?.COMMENTS      || null,
+      };
+    }));
+
+    res.json({ success: true, data: enriched });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

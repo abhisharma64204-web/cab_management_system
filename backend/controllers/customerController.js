@@ -1,4 +1,8 @@
 const Customer = require('../models/Customer');
+const Ride     = require('../models/Ride');
+const Driver   = require('../models/Driver');
+const Payment  = require('../models/Payment');
+const Feedback = require('../models/Feedback');
 
 // GET all customers
 exports.getAllCustomers = async (req, res) => {
@@ -118,12 +122,28 @@ exports.deleteCustomer = async (req, res) => {
   }
 };
 
-// GET customer booking history
+// GET customer booking history (rides enriched with payment & feedback)
 exports.getCustomerHistory = async (req, res) => {
   try {
-    // Returning an empty array for now to prevent frontend dashboard crashes 
-    // until your Ride, Driver, and Feedback models are also migrated to MongoDB
-    res.json({ success: true, data: [] });
+    const rides = await Ride.find({ CUST_ID: req.params.id }).sort({ REQUEST_TIME: -1 }).lean();
+
+    const enriched = await Promise.all(rides.map(async (ride) => {
+      const drv      = await Driver.findOne({ DRIVER_ID: ride.DRIVER_ID })
+                             .select('DRIVER_NAME VEHICLE_NO').lean();
+      const payment  = await Payment.findOne({ RIDE_ID: ride.RIDE_ID }).lean();
+      const feedback = await Feedback.findOne({ RIDE_ID: ride.RIDE_ID }).lean();
+      return {
+        ...ride,
+        DRIVER_NAME:    drv?.DRIVER_NAME    || '',
+        VEHICLE_NO:     drv?.VEHICLE_NO     || '',
+        PAYMENT_STATUS: payment?.PAYMENT_STATUS || null,
+        PAYMENT_METHOD: payment?.PAYMENT_METHOD || null,
+        RATING:         feedback?.RATING        || null,
+        COMMENTS:       feedback?.COMMENTS      || null,
+      };
+    }));
+
+    res.json({ success: true, data: enriched });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

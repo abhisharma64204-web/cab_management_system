@@ -57,7 +57,7 @@ function AppRoutes() {
       </main>
 
       <footer style={{ background: 'var(--s800)', color: 'rgba(255,255,255,.6)', textAlign: 'center', padding: '14px 24px', fontSize: '0.82rem' }}>
-        © 2025 CabGo — Cab Management System · React + Node.js + MySQL + Socket.io
+        © 2025 CabGo — Cab Management System · React + Node.js + MongoDB + Socket.io
       </footer>
 
       <Toaster

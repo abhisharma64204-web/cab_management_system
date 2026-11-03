@@ -1,17 +1,26 @@
-const db = require('../config/db');
+﻿const Feedback = require('../models/Feedback');
+const Ride     = require('../models/Ride');
+const Driver   = require('../models/Driver');
+const Customer = require('../models/Customer');
+const Payment  = require('../models/Payment');
 
-// GET all feedbacks
+// GET all feedbacks (enriched with names)
 exports.getAllFeedback = async (req, res) => {
   try {
-    const [rows] = await db.query(
-      `SELECT F.*, C.CUST_NAME, D.DRIVER_NAME, R.PICKUP_LOC, R.DROP_LOC
-       FROM FEEDBACK F
-       JOIN CUSTOMER C ON F.CUST_ID=C.CUST_ID
-       JOIN DRIVER   D ON F.DRIVER_ID=D.DRIVER_ID
-       JOIN RIDE     R ON F.RIDE_ID=R.RIDE_ID
-       ORDER BY F.FEEDBACK_DATE DESC`
-    );
-    res.json({ success: true, data: rows });
+    const feedbacks = await Feedback.find().sort({ FEEDBACK_DATE: -1 }).lean();
+    const enriched = await Promise.all(feedbacks.map(async (f) => {
+      const cust = await Customer.findOne({ CUST_ID:   f.CUST_ID   }).select('CUST_NAME').lean();
+      const drv  = await Driver.findOne  ({ DRIVER_ID: f.DRIVER_ID }).select('DRIVER_NAME').lean();
+      const ride = await Ride.findOne    ({ RIDE_ID:   f.RIDE_ID   }).select('PICKUP_LOC DROP_LOC').lean();
+      return {
+        ...f,
+        CUST_NAME:   cust?.CUST_NAME   || '',
+        DRIVER_NAME: drv?.DRIVER_NAME  || '',
+        PICKUP_LOC:  ride?.PICKUP_LOC  || '',
+        DROP_LOC:    ride?.DROP_LOC    || '',
+      };
+    }));
+    res.json({ success: true, data: enriched });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -23,36 +32,42 @@ exports.submitFeedback = async (req, res) => {
   if (!RIDE_ID || !CUST_ID || !DRIVER_ID || !RATING)
     return res.status(400).json({ success: false, message: 'Required fields missing' });
   if (RATING < 1 || RATING > 5)
-    return res.status(400).json({ success: false, message: 'Rating must be 1–5' });
+    return res.status(400).json({ success: false, message: 'Rating must be 1-5' });
 
   try {
-    // Verify ride is completed & belongs to customer
-    const [[ride]] = await db.query(
-      "SELECT * FROM RIDE WHERE RIDE_ID=? AND CUST_ID=? AND RIDE_STATUS='Completed'",
-      [RIDE_ID, CUST_ID]
-    );
+    // Verify ride is completed and belongs to customer
+    const ride = await Ride.findOne({ RIDE_ID, CUST_ID, RIDE_STATUS: 'Completed' });
     if (!ride) return res.status(400).json({ success: false, message: 'Ride not eligible for feedback' });
 
-    const [[exist]] = await db.query("SELECT FEEDBACK_ID FROM FEEDBACK WHERE RIDE_ID=?", [RIDE_ID]);
+    // Check duplicate feedback
+    const exist = await Feedback.findOne({ RIDE_ID });
     if (exist) return res.status(409).json({ success: false, message: 'Feedback already submitted' });
 
     // Check payment done
-    const [[pay]] = await db.query("SELECT PAYMENT_ID FROM PAYMENT WHERE RIDE_ID=? AND PAYMENT_STATUS='Completed'", [RIDE_ID]);
+    const pay = await Payment.findOne({ RIDE_ID, PAYMENT_STATUS: 'Completed' });
     if (!pay) return res.status(400).json({ success: false, message: 'Payment must be completed first' });
 
-    const [[{maxId}]] = await db.query("SELECT MAX(CAST(SUBSTRING(FEEDBACK_ID,2) AS UNSIGNED)) AS maxId FROM FEEDBACK");
-    const fbId = 'F' + String((maxId || 0) + 1).padStart(3, '0');
+    // Generate sequential FEEDBACK_ID (F001, F002...)
+    const lastFb = await Feedback.findOne().sort({ FEEDBACK_ID: -1 });
+    let maxId = 0;
+    if (lastFb && lastFb.FEEDBACK_ID) {
+      maxId = parseInt(lastFb.FEEDBACK_ID.substring(1), 10) || 0;
+    }
+    const fbId = 'F' + String(maxId + 1).padStart(3, '0');
 
-    await db.query(
-      "INSERT INTO FEEDBACK (FEEDBACK_ID,RIDE_ID,CUST_ID,DRIVER_ID,RATING,COMMENTS) VALUES (?,?,?,?,?,?)",
-      [fbId, RIDE_ID, CUST_ID, DRIVER_ID, RATING, COMMENTS || '']
-    );
+    await Feedback.create({
+      FEEDBACK_ID: fbId,
+      RIDE_ID,
+      CUST_ID,
+      DRIVER_ID,
+      RATING: Number(RATING),
+      COMMENTS: COMMENTS || '',
+    });
 
     // Recalculate driver AVG_RATING
-    await db.query(
-      "UPDATE DRIVER SET AVG_RATING=(SELECT ROUND(AVG(RATING),2) FROM FEEDBACK WHERE DRIVER_ID=?) WHERE DRIVER_ID=?",
-      [DRIVER_ID, DRIVER_ID]
-    );
+    const allFb = await Feedback.find({ DRIVER_ID });
+    const avgRating = allFb.reduce((sum, f) => sum + f.RATING, 0) / allFb.length;
+    await Driver.findOneAndUpdate({ DRIVER_ID }, { $set: { AVG_RATING: parseFloat(avgRating.toFixed(2)) } });
 
     res.status(201).json({ success: true, message: 'Feedback submitted. Thank you!', data: { FEEDBACK_ID: fbId } });
   } catch (err) {
@@ -63,19 +78,22 @@ exports.submitFeedback = async (req, res) => {
 // GET driver rating report
 exports.getDriverRatings = async (req, res) => {
   try {
-    const [rows] = await db.query(
-      `SELECT D.DRIVER_ID, D.DRIVER_NAME, D.VEHICLE_TYPE, D.AVG_RATING, D.TOTAL_RIDES,
-              COUNT(F.FEEDBACK_ID) AS total_reviews,
-              SUM(CASE WHEN F.RATING=5 THEN 1 ELSE 0 END) AS five_star,
-              SUM(CASE WHEN F.RATING=4 THEN 1 ELSE 0 END) AS four_star,
-              SUM(CASE WHEN F.RATING<=3 THEN 1 ELSE 0 END) AS three_or_less
-       FROM DRIVER D
-       LEFT JOIN FEEDBACK F ON D.DRIVER_ID=F.DRIVER_ID
-       WHERE D.VERIFY_STATUS='Verified'
-       GROUP BY D.DRIVER_ID
-       ORDER BY D.AVG_RATING DESC`
-    );
-    res.json({ success: true, data: rows });
+    const drivers = await Driver.find({ VERIFY_STATUS: 'Verified' }).sort({ AVG_RATING: -1 }).lean();
+    const result = await Promise.all(drivers.map(async (d) => {
+      const feedbacks = await Feedback.find({ DRIVER_ID: d.DRIVER_ID }).lean();
+      return {
+        DRIVER_ID:     d.DRIVER_ID,
+        DRIVER_NAME:   d.DRIVER_NAME,
+        VEHICLE_TYPE:  d.VEHICLE_TYPE,
+        AVG_RATING:    d.AVG_RATING,
+        TOTAL_RIDES:   d.TOTAL_RIDES,
+        total_reviews: feedbacks.length,
+        five_star:     feedbacks.filter(f => f.RATING === 5).length,
+        four_star:     feedbacks.filter(f => f.RATING === 4).length,
+        three_or_less: feedbacks.filter(f => f.RATING <= 3).length,
+      };
+    }));
+    res.json({ success: true, data: result });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
