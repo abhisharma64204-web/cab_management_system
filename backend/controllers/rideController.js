@@ -1,26 +1,37 @@
-const db = require('../config/db');
+const Ride = require('../models/Ride');
+const Customer = require('../models/Customer');
+const Driver = require('../models/Driver');
 
 const FARE_RATES = { Standard: 12, Premium: 20, SUV: 18, Auto: 8 };
 const BASE_FARE  = 40;
 
 const calcFare = (dist, type) => Math.round(BASE_FARE + dist * (FARE_RATES[type] || 12));
 
-// GET all rides
+// GET all rides with dynamic query filters
 exports.getAllRides = async (req, res) => {
   try {
     const { status, cust_id, driver_id } = req.query;
-    let sql = `SELECT R.*, C.CUST_NAME, D.DRIVER_NAME, D.VEHICLE_NO
-               FROM RIDE R
-               LEFT JOIN CUSTOMER C ON R.CUST_ID=C.CUST_ID
-               LEFT JOIN DRIVER   D ON R.DRIVER_ID=D.DRIVER_ID
-               WHERE 1=1`;
-    const params = [];
-    if (status)    { sql += ' AND R.RIDE_STATUS=?'; params.push(status); }
-    if (cust_id)   { sql += ' AND R.CUST_ID=?';     params.push(cust_id); }
-    if (driver_id) { sql += ' AND R.DRIVER_ID=?';   params.push(driver_id); }
-    sql += ' ORDER BY R.REQUEST_TIME DESC';
-    const [rows] = await db.query(sql, params);
-    res.json({ success: true, data: rows });
+    let queryFilter = {};
+
+    if (status) queryFilter.RIDE_STATUS = status;
+    if (cust_id) queryFilter.CUST_ID = cust_id;
+    if (driver_id) queryFilter.DRIVER_ID = driver_id;
+
+    const rides = await Ride.find(queryFilter).sort({ REQUEST_TIME: -1 }).lean();
+
+    // Map relational fields to match original SQL JOIN outputs
+    const enrichedRides = await Promise.all(rides.map(async (ride) => {
+      const cust = await Customer.findOne({ CUST_ID: ride.CUST_ID }).select('CUST_NAME').lean();
+      const drv = await Driver.findOne({ DRIVER_ID: ride.DRIVER_ID }).select('DRIVER_NAME VEHICLE_NO').lean();
+      return {
+        ...ride,
+        CUST_NAME: cust?.CUST_NAME || '',
+        DRIVER_NAME: drv?.DRIVER_NAME || '',
+        VEHICLE_NO: drv?.VEHICLE_NO || ''
+      };
+    }));
+
+    res.json({ success: true, data: enrichedRides });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -29,62 +40,88 @@ exports.getAllRides = async (req, res) => {
 // GET single ride
 exports.getRideById = async (req, res) => {
   try {
-    const [[ride]] = await db.query(
-      `SELECT R.*, C.CUST_NAME, C.CUST_PHONE,
-              D.DRIVER_NAME, D.DRIVER_PHONE, D.VEHICLE_NO, D.VEHICLE_TYPE
-       FROM RIDE R
-       LEFT JOIN CUSTOMER C ON R.CUST_ID=C.CUST_ID
-       LEFT JOIN DRIVER   D ON R.DRIVER_ID=D.DRIVER_ID
-       WHERE R.RIDE_ID=?`, [req.params.id]
-    );
+    const ride = await Ride.findOne({ RIDE_ID: req.params.id }).lean();
     if (!ride) return res.status(404).json({ success: false, message: 'Ride not found' });
-    res.json({ success: true, data: ride });
+
+    const cust = await Customer.findOne({ CUST_ID: ride.CUST_ID }).select('CUST_NAME CUST_PHONE').lean();
+    const drv = await Driver.findOne({ DRIVER_ID: ride.DRIVER_ID }).select('DRIVER_NAME DRIVER_PHONE VEHICLE_NO VEHICLE_TYPE').lean();
+
+    const formattedData = {
+      ...ride,
+      CUST_NAME: cust?.CUST_NAME || '',
+      CUST_PHONE: cust?.CUST_PHONE || '',
+      DRIVER_NAME: drv?.DRIVER_NAME || '',
+      DRIVER_PHONE: drv?.DRIVER_PHONE || '',
+      VEHICLE_NO: drv?.VEHICLE_NO || '',
+      VEHICLE_TYPE: drv?.VEHICLE_TYPE || ''
+    };
+
+    res.json({ success: true, data: formattedData });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// POST request a ride
+// POST request and auto-assign a ride
 exports.requestRide = async (req, res) => {
   const { CUST_ID, PICKUP_LOC, DROP_LOC, RIDE_TYPE, DISTANCE } = req.body;
   if (!CUST_ID || !PICKUP_LOC || !DROP_LOC || !DISTANCE)
     return res.status(400).json({ success: false, message: 'Required fields missing' });
 
   try {
-    // Check active ride
-    const [[activeRide]] = await db.query(
-      "SELECT RIDE_ID FROM RIDE WHERE CUST_ID=? AND RIDE_STATUS IN ('Pending','Accepted','Ongoing')",
-      [CUST_ID]
-    );
+    // Check for existing active ride bookings
+    const activeRide = await Ride.findOne({
+      CUST_ID,
+      RIDE_STATUS: { $in: ['Pending', 'Accepted', 'Ongoing'] }
+    });
     if (activeRide) return res.status(409).json({ success: false, message: 'You already have an active ride' });
 
     // Auto-assign best available driver
-    const [[driver]] = await db.query(
-      "SELECT * FROM DRIVER WHERE AVAIL_STATUS='Available' AND VERIFY_STATUS='Verified' ORDER BY AVG_RATING DESC LIMIT 1"
-    );
+    const driver = await Driver.findOne({ AVAIL_STATUS: 'Available', VERIFY_STATUS: 'Verified' }).sort({ AVG_RATING: -1 });
     if (!driver) return res.status(404).json({ success: false, message: 'No drivers available right now' });
 
     const fare = calcFare(Number(DISTANCE), RIDE_TYPE || 'Standard');
-    const [[{maxId}]] = await db.query("SELECT MAX(CAST(SUBSTRING(RIDE_ID,2) AS UNSIGNED)) AS maxId FROM RIDE");
-    const rideId = 'R' + String((maxId || 0) + 1).padStart(3, '0');
+    
+    // Generate system incremental unique RIDE_ID
+    const lastRide = await Ride.findOne().sort({ RIDE_ID: -1 });
+    let maxId = 0;
+    if (lastRide && lastRide.RIDE_ID) {
+      maxId = parseInt(lastRide.RIDE_ID.substring(1), 10) || 0;
+    }
+    const rideId = 'R' + String(maxId + 1).padStart(3, '0');
 
-    await db.query(
-      `INSERT INTO RIDE (RIDE_ID,CUST_ID,DRIVER_ID,PICKUP_LOC,DROP_LOC,RIDE_TYPE,DISTANCE,FARE,RIDE_STATUS)
-       VALUES (?,?,?,?,?,?,?,?,'Accepted')`,
-      [rideId, CUST_ID, driver.DRIVER_ID, PICKUP_LOC, DROP_LOC, RIDE_TYPE || 'Standard', DISTANCE, fare]
-    );
-    await db.query("UPDATE DRIVER SET AVAIL_STATUS='Busy' WHERE DRIVER_ID=?", [driver.DRIVER_ID]);
+    // Save transaction document to cluster instance
+    const newRide = await Ride.create({
+      RIDE_ID: rideId,
+      CUST_ID,
+      DRIVER_ID: driver.DRIVER_ID,
+      PICKUP_LOC,
+      DROP_LOC,
+      RIDE_TYPE: RIDE_TYPE || 'Standard',
+      DISTANCE: Number(DISTANCE),
+      FARE: fare,
+      RIDE_STATUS: 'Accepted',
+      REQUEST_TIME: new Date()
+    });
 
-    const [[newRide]] = await db.query(
-      `SELECT R.*, C.CUST_NAME, D.DRIVER_NAME, D.VEHICLE_NO, D.DRIVER_PHONE
-       FROM RIDE R JOIN CUSTOMER C ON R.CUST_ID=C.CUST_ID JOIN DRIVER D ON R.DRIVER_ID=D.DRIVER_ID
-       WHERE R.RIDE_ID=?`, [rideId]
-    );
+    // Update driver state to Busy
+    await Driver.findOneAndUpdate({ DRIVER_ID: driver.DRIVER_ID }, { $set: { AVAIL_STATUS: 'Busy' } });
 
-    // Emit socket event (attached via req.io)
-    if (req.io) req.io.emit('rideAccepted', newRide);
+    // Fetch details for socket layout data synchronization
+    const cust = await Customer.findOne({ CUST_ID }).select('CUST_NAME').lean();
+    
+    const socketPayload = {
+      ...newRide.toObject(),
+      CUST_NAME: cust?.CUST_NAME || '',
+      DRIVER_NAME: driver.DRIVER_NAME,
+      VEHICLE_NO: driver.VEHICLE_NO,
+      DRIVER_PHONE: driver.DRIVER_PHONE
+    };
 
-    res.status(201).json({ success: true, message: 'Ride booked successfully', data: newRide });
+    // Emit live real-time event
+    if (req.io) req.io.emit('rideAccepted', socketPayload);
+
+    res.status(201).json({ success: true, message: 'Ride booked successfully', data: socketPayload });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -93,18 +130,26 @@ exports.requestRide = async (req, res) => {
 // PATCH start ride
 exports.startRide = async (req, res) => {
   try {
-    const [[ride]] = await db.query("SELECT * FROM RIDE WHERE RIDE_ID=?", [req.params.id]);
+    const ride = await Ride.findOne({ RIDE_ID: req.params.id });
     if (!ride) return res.status(404).json({ success: false, message: 'Ride not found' });
     if (ride.RIDE_STATUS !== 'Accepted') return res.status(400).json({ success: false, message: 'Ride cannot be started' });
 
-    await db.query("UPDATE RIDE SET RIDE_STATUS='Ongoing', START_TIME=NOW() WHERE RIDE_ID=?", [req.params.id]);
-    const [[updated]] = await db.query(
-      `SELECT R.*, C.CUST_NAME, D.DRIVER_NAME, D.VEHICLE_NO FROM RIDE R
-       JOIN CUSTOMER C ON R.CUST_ID=C.CUST_ID JOIN DRIVER D ON R.DRIVER_ID=D.DRIVER_ID WHERE R.RIDE_ID=?`,
-      [req.params.id]
-    );
-    if (req.io) req.io.emit('rideStarted', updated);
-    res.json({ success: true, message: 'Ride started', data: updated });
+    ride.RIDE_STATUS = 'Ongoing';
+    ride.START_TIME = new Date();
+    await ride.save();
+
+    const cust = await Customer.findOne({ CUST_ID: ride.CUST_ID }).select('CUST_NAME').lean();
+    const drv = await Driver.findOne({ DRIVER_ID: ride.DRIVER_ID }).select('DRIVER_NAME VEHICLE_NO').lean();
+
+    const updatedPayload = {
+      ...ride.toObject(),
+      CUST_NAME: cust?.CUST_NAME || '',
+      DRIVER_NAME: drv?.DRIVER_NAME || '',
+      VEHICLE_NO: drv?.VEHICLE_NO || ''
+    };
+
+    if (req.io) req.io.emit('rideStarted', updatedPayload);
+    res.json({ success: true, message: 'Ride started', data: updatedPayload });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -113,20 +158,31 @@ exports.startRide = async (req, res) => {
 // PATCH end ride
 exports.endRide = async (req, res) => {
   try {
-    const [[ride]] = await db.query("SELECT * FROM RIDE WHERE RIDE_ID=?", [req.params.id]);
+    const ride = await Ride.findOne({ RIDE_ID: req.params.id });
     if (!ride) return res.status(404).json({ success: false, message: 'Ride not found' });
     if (ride.RIDE_STATUS !== 'Ongoing') return res.status(400).json({ success: false, message: 'Ride is not ongoing' });
 
-    await db.query("UPDATE RIDE SET RIDE_STATUS='Completed', END_TIME=NOW() WHERE RIDE_ID=?", [req.params.id]);
-    await db.query("UPDATE DRIVER SET AVAIL_STATUS='Available', TOTAL_RIDES=TOTAL_RIDES+1 WHERE DRIVER_ID=?", [ride.DRIVER_ID]);
+    ride.RIDE_STATUS = 'Completed';
+    ride.END_TIME = new Date();
+    await ride.save();
 
-    const [[updated]] = await db.query(
-      `SELECT R.*, C.CUST_NAME, D.DRIVER_NAME FROM RIDE R
-       JOIN CUSTOMER C ON R.CUST_ID=C.CUST_ID JOIN DRIVER D ON R.DRIVER_ID=D.DRIVER_ID WHERE R.RIDE_ID=?`,
-      [req.params.id]
+    // Free up driver and increment completed ride score counters
+    await Driver.findOneAndUpdate(
+      { DRIVER_ID: ride.DRIVER_ID },
+      { $set: { AVAIL_STATUS: 'Available' }, $inc: { TOTAL_RIDES: 1 } }
     );
-    if (req.io) req.io.emit('rideCompleted', updated);
-    res.json({ success: true, message: 'Ride completed', data: updated });
+
+    const cust = await Customer.findOne({ CUST_ID: ride.CUST_ID }).select('CUST_NAME').lean();
+    const drv = await Driver.findOne({ DRIVER_ID: ride.DRIVER_ID }).select('DRIVER_NAME').lean();
+
+    const completedPayload = {
+      ...ride.toObject(),
+      CUST_NAME: cust?.CUST_NAME || '',
+      DRIVER_NAME: drv?.DRIVER_NAME || ''
+    };
+
+    if (req.io) req.io.emit('rideCompleted', completedPayload);
+    res.json({ success: true, message: 'Ride completed', data: completedPayload });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -135,14 +191,17 @@ exports.endRide = async (req, res) => {
 // PATCH cancel ride
 exports.cancelRide = async (req, res) => {
   try {
-    const [[ride]] = await db.query("SELECT * FROM RIDE WHERE RIDE_ID=?", [req.params.id]);
+    const ride = await Ride.findOne({ RIDE_ID: req.params.id });
     if (!ride) return res.status(404).json({ success: false, message: 'Ride not found' });
-    if (['Completed','Cancelled'].includes(ride.RIDE_STATUS))
+    if (['Completed', 'Cancelled'].includes(ride.RIDE_STATUS))
       return res.status(400).json({ success: false, message: 'Cannot cancel this ride' });
 
-    await db.query("UPDATE RIDE SET RIDE_STATUS='Cancelled' WHERE RIDE_ID=?", [req.params.id]);
-    if (ride.DRIVER_ID)
-      await db.query("UPDATE DRIVER SET AVAIL_STATUS='Available' WHERE DRIVER_ID=?", [ride.DRIVER_ID]);
+    ride.RIDE_STATUS = 'Cancelled';
+    await ride.save();
+
+    if (ride.DRIVER_ID) {
+      await Driver.findOneAndUpdate({ DRIVER_ID: ride.DRIVER_ID }, { $set: { AVAIL_STATUS: 'Available' } });
+    }
 
     res.json({ success: true, message: 'Ride cancelled' });
   } catch (err) {
@@ -150,18 +209,26 @@ exports.cancelRide = async (req, res) => {
   }
 };
 
-// GET active rides (real-time dashboard)
+// GET active rides for live tracking panel synchronization metrics logs
 exports.getActiveRides = async (req, res) => {
   try {
-    const [rows] = await db.query(
-      `SELECT R.*, C.CUST_NAME, C.CUST_PHONE, D.DRIVER_NAME, D.DRIVER_PHONE, D.VEHICLE_NO, D.VEHICLE_TYPE
-       FROM RIDE R
-       JOIN CUSTOMER C ON R.CUST_ID=C.CUST_ID
-       JOIN DRIVER   D ON R.DRIVER_ID=D.DRIVER_ID
-       WHERE R.RIDE_STATUS IN ('Accepted','Ongoing')
-       ORDER BY R.REQUEST_TIME DESC`
-    );
-    res.json({ success: true, data: rows });
+    const rides = await Ride.find({ RIDE_STATUS: { $in: ['Accepted', 'Ongoing'] } }).sort({ REQUEST_TIME: -1 }).lean();
+
+    const enrichedActiveRides = await Promise.all(rides.map(async (ride) => {
+      const cust = await Customer.findOne({ CUST_ID: ride.CUST_ID }).select('CUST_NAME CUST_PHONE').lean();
+      const drv = await Driver.findOne({ DRIVER_ID: ride.DRIVER_ID }).select('DRIVER_NAME DRIVER_PHONE VEHICLE_NO VEHICLE_TYPE').lean();
+      return {
+        ...ride,
+        CUST_NAME: cust?.CUST_NAME || '',
+        CUST_PHONE: cust?.CUST_PHONE || '',
+        DRIVER_NAME: drv?.DRIVER_NAME || '',
+        DRIVER_PHONE: drv?.DRIVER_PHONE || '',
+        VEHICLE_NO: drv?.VEHICLE_NO || '',
+        VEHICLE_TYPE: drv?.VEHICLE_TYPE || ''
+      };
+    }));
+
+    res.json({ success: true, data: enrichedActiveRides });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
