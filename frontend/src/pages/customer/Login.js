@@ -76,7 +76,7 @@ export default function CustomerLogin() {
 
         <div className="divider" />
         <div style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--s400)' }}>
-          🔑 Demo: <strong>amit@email.com</strong> / <strong>pass123</strong>
+          🔑 Demo: <strong>qwerty@example.com</strong> / <strong>qwerty</strong>
         </div>
       </div>
     </div>

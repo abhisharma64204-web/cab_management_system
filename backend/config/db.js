@@ -1,29 +1,20 @@
-const mysql = require('mysql2/promise');
-require('dotenv').config();
+const mongoose = require('mongoose');
 
-const pool = mysql.createPool({
-  host:     process.env.DB_HOST     || 'localhost',
-  port:     process.env.DB_PORT     || 3306,
-  port:     parseInt(process.env.DB_PORT, 10) || 3306,
-  user:     process.env.DB_USER     || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME     || 'cab_management',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  ssl: process.env.DB_SSL === 'true' || process.env.DB_SSL === '1' ? { rejectUnauthorized: false } : undefined,
-});
-
-// Test connection on startup
-(async () => {
+const connectDB = async () => {
   try {
-    const conn = await pool.getConnection();
-    console.log('✅  MySQL connected successfully');
-    conn.release();
-  } catch (err) {
-    console.error('❌  MySQL connection failed:', err.message);
-    console.error('\u2192 Hint: ensure your DB credentials are set in backend/.env or environment variables (DB_HOST, DB_USER, DB_PASSWORD, DB_NAME).');
-  }
-})();
+    const user = process.env.MONGO_USER;
+    const pass = encodeURIComponent(process.env.MONGO_PASS);
+    const cluster = process.env.MONGO_CLUSTER;
+    const db = process.env.MONGO_DB;
 
-module.exports = pool;
+    const mongoURI = `mongodb+srv://${user}:${pass}@${cluster}/${db}?retryWrites=true&w=majority&appName=Cluster0`;
+
+    const conn = await mongoose.connect(mongoURI);
+    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+  } catch (error) {
+    console.error(`❌ MongoDB Connection Error: ${error.message}`);
+    process.exit(1);
+  }
+};
+
+module.exports = connectDB;

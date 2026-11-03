@@ -7,6 +7,21 @@ import { Spinner } from '../../components/common';
 
 const CITIES = ['Mumbai','Delhi','Bangalore','Chennai','Hyderabad','Pune','Kolkata','Ahmedabad','Jaipur','Surat'];
 
+// ✅ 1. Moved outside the main component so it doesn't re-render and lose focus on every keystroke
+const Field = ({ name, label, type = 'text', placeholder, value, onChange, error }) => (
+  <div className="form-group">
+    <label className="form-label">{label} <span>*</span></label>
+    <input
+      className="form-input"
+      type={type}
+      placeholder={placeholder}
+      value={value}
+      onChange={e => onChange(name, e.target.value)}
+    />
+    {error && <span className="form-error">{error}</span>}
+  </div>
+);
+
 export default function CustomerRegister() {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -29,7 +44,7 @@ export default function CustomerRegister() {
     if (!form.CUST_NAME.trim())                         e.CUST_NAME     = 'Full name is required';
     if (!/^\d{10}$/.test(form.CUST_PHONE))              e.CUST_PHONE    = 'Enter a valid 10-digit phone';
     if (!/\S+@\S+\.\S+/.test(form.CUST_EMAIL))          e.CUST_EMAIL    = 'Enter a valid email address';
-    if (!form.CUST_ADDRESS.trim())                       e.CUST_ADDRESS  = 'Address is required';
+    if (!form.CUST_ADDRESS.trim())                      e.CUST_ADDRESS  = 'Address is required';
     if (form.CUST_PASSWORD.length < 6)                   e.CUST_PASSWORD = 'Min 6 characters';
     if (form.CUST_PASSWORD !== form.confirm)             e.confirm       = 'Passwords do not match';
     return e;
@@ -48,25 +63,13 @@ export default function CustomerRegister() {
       toast.success('Welcome aboard! 🎉 Account created successfully.');
       navigate('/book');
     } catch (err) {
-      toast.error(err.message);
+      // Safely catches errors from backend database validations
+      const errMsg = err.response?.data?.message || err.message;
+      toast.error(errMsg);
     } finally {
       setLoading(false);
     }
   };
-
-  const Field = ({ name, label, type = 'text', placeholder, half }) => (
-    <div className={`form-group${half ? '' : ''}`}>
-      <label className="form-label">{label} <span>*</span></label>
-      <input
-        className="form-input"
-        type={type}
-        placeholder={placeholder}
-        value={form[name]}
-        onChange={e => set(name, e.target.value)}
-      />
-      {errors[name] && <span className="form-error">{errors[name]}</span>}
-    </div>
-  );
 
   return (
     <div className="page-container" style={{ maxWidth: 700 }}>
@@ -85,9 +88,31 @@ export default function CustomerRegister() {
           {/* Personal Info */}
           <div className="section-title">Personal Information</div>
           <div className="form-grid mb-16">
-            <Field name="CUST_NAME"    label="Full Name"    placeholder="Your full name" />
-            <Field name="CUST_PHONE"   label="Phone Number" placeholder="10-digit mobile" />
-            <Field name="CUST_EMAIL"   label="Email Address" type="email" placeholder="you@example.com" />
+            <Field 
+              name="CUST_NAME" 
+              label="Full Name" 
+              placeholder="Your full name" 
+              value={form.CUST_NAME} 
+              onChange={set} 
+              error={errors.CUST_NAME} 
+            />
+            <Field 
+              name="CUST_PHONE" 
+              label="Phone Number" 
+              placeholder="10-digit mobile" 
+              value={form.CUST_PHONE} 
+              onChange={set} 
+              error={errors.CUST_PHONE} 
+            />
+            <Field 
+              name="CUST_EMAIL" 
+              label="Email Address" 
+              type="email" 
+              placeholder="you@example.com" 
+              value={form.CUST_EMAIL} 
+              onChange={set} 
+              error={errors.CUST_EMAIL} 
+            />
             <div className="form-group">
               <label className="form-label">City <span>*</span></label>
               <select className="form-select" value={form.CUST_CITY} onChange={e => set('CUST_CITY', e.target.value)}>
@@ -95,15 +120,38 @@ export default function CustomerRegister() {
               </select>
             </div>
             <div className="form-group col-span-2">
-              <Field name="CUST_ADDRESS" label="Street Address" placeholder="House/flat no, street name" />
+              <Field 
+                name="CUST_ADDRESS" 
+                label="Street Address" 
+                placeholder="House/flat no, street name" 
+                value={form.CUST_ADDRESS} 
+                onChange={set} 
+                error={errors.CUST_ADDRESS} 
+              />
             </div>
           </div>
 
           {/* Security */}
           <div className="section-title">Account Security</div>
           <div className="form-grid mb-20">
-            <Field name="CUST_PASSWORD" label="Password"         type="password" placeholder="Minimum 6 characters" />
-            <Field name="confirm"       label="Confirm Password" type="password" placeholder="Repeat your password" />
+            <Field 
+              name="CUST_PASSWORD" 
+              label="Password" 
+              type="password" 
+              placeholder="Minimum 6 characters" 
+              value={form.CUST_PASSWORD} 
+              onChange={set} 
+              error={errors.CUST_PASSWORD} 
+            />
+            <Field 
+              name="confirm" 
+              label="Confirm Password" 
+              type="password" 
+              placeholder="Repeat your password" 
+              value={form.confirm} 
+              onChange={set} 
+              error={errors.confirm} 
+            />
           </div>
 
           <button type="submit" className="btn btn-primary btn-lg btn-full" disabled={loading}>

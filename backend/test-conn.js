@@ -1,20 +1,26 @@
-const mysql = require('mysql2/promise');
-require('dotenv').config();
+const mongoose = require('mongoose');
+const dotenv = require('dotenv');
 
-(async () => {
+dotenv.config();
+
+const testConnection = async () => {
   try {
-    const conn = await mysql.createConnection({
-      host: process.env.DB_HOST || '127.0.0.1',
-      port: process.env.DB_PORT || 3306,
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || undefined,
-    });
-    console.log('✅  Test connection successful');
-    await conn.end();
-  } catch (err) {
-    console.error('❌  Test connection failed:', err.message);
-    if (err && err.stack) console.error(err.stack);
+    const user = process.env.MONGO_USER;
+    const pass = encodeURIComponent(process.env.MONGO_PASS); // Safely encodes the '@' character
+    const cluster = process.env.MONGO_CLUSTER;
+    const db = process.env.MONGO_DB;
+
+    // Dynamically construct the URI
+    const mongoURI = `mongodb+srv://${user}:${pass}@${cluster}/${db}?retryWrites=true&w=majority&appName=Cluster0`;
+
+    console.log('🔄 Attempting to connect to MongoDB Atlas...');
+    await mongoose.connect(mongoURI);
+    console.log('✅ Connected to MongoDB Atlas successfully!');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Connection failed:', error.message);
     process.exit(1);
   }
-})();
+};
+
+testConnection();

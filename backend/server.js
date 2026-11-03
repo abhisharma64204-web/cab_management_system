@@ -2,10 +2,16 @@ const express    = require('express');
 const http       = require('http');
 const { Server } = require('socket.io');
 const cors       = require('cors');
-require('dotenv').config();
+require('dotenv').config(); // Loads environment configuration first
+
+const connectDB  = require('./config/db'); // Imports MongoDB connection routine
 
 const app    = express();
 const server = http.createServer(app);
+
+// Initialize MongoDB Connection before serving network requests
+connectDB();
+
 const allowedOrigins = process.env.CLIENT_URL
   ? process.env.CLIENT_URL.split(',').map(s => s.trim().replace(/\/$/, ''))
   : ['http://localhost:3000'];

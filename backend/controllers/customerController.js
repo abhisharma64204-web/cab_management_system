@@ -1,11 +1,12 @@
-const db = require('../config/db');
+const Customer = require('../models/Customer');
 
 // GET all customers
 exports.getAllCustomers = async (req, res) => {
   try {
-    const [rows] = await db.query(
-      'SELECT CUST_ID, CUST_NAME, CUST_PHONE, CUST_EMAIL, CUST_ADDRESS, CUST_CITY, REG_DATE, IS_ACTIVE FROM CUSTOMER ORDER BY REG_DATE DESC'
-    );
+    const rows = await Customer.find()
+      .select('CUST_ID CUST_NAME CUST_PHONE CUST_EMAIL CUST_ADDRESS CUST_CITY REG_DATE IS_ACTIVE')
+      .sort({ REG_DATE: -1 });
+
     res.json({ success: true, data: rows });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -15,12 +16,11 @@ exports.getAllCustomers = async (req, res) => {
 // GET single customer
 exports.getCustomerById = async (req, res) => {
   try {
-    const [rows] = await db.query(
-      'SELECT CUST_ID, CUST_NAME, CUST_PHONE, CUST_EMAIL, CUST_ADDRESS, CUST_CITY, REG_DATE FROM CUSTOMER WHERE CUST_ID = ?',
-      [req.params.id]
-    );
-    if (!rows.length) return res.status(404).json({ success: false, message: 'Customer not found' });
-    res.json({ success: true, data: rows[0] });
+    const row = await Customer.findOne({ CUST_ID: req.params.id })
+      .select('CUST_ID CUST_NAME CUST_PHONE CUST_EMAIL CUST_ADDRESS CUST_CITY REG_DATE');
+
+    if (!row) return res.status(404).json({ success: false, message: 'Customer not found' });
+    res.json({ success: true, data: row });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -34,17 +34,36 @@ exports.registerCustomer = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Required fields missing' });
 
   try {
-    const [[exist]] = await db.query('SELECT CUST_ID FROM CUSTOMER WHERE CUST_EMAIL=? OR CUST_PHONE=?', [CUST_EMAIL, CUST_PHONE]);
+    // Check if user already exists
+    const exist = await Customer.findOne({ $or: [{ CUST_EMAIL }, { CUST_PHONE }] });
     if (exist) return res.status(409).json({ success: false, message: 'Email or phone already registered' });
 
-    const [[{maxId}]] = await db.query("SELECT MAX(CAST(SUBSTRING(CUST_ID,2) AS UNSIGNED)) AS maxId FROM CUSTOMER");
-    const newId = 'C' + String((maxId || 0) + 1).padStart(3, '0');
+    // Generate custom incremental CUST_ID (C001, C002...)
+    const lastCustomer = await Customer.findOne().sort({ CUST_ID: -1 });
+    let maxId = 0;
+    if (lastCustomer && lastCustomer.CUST_ID) {
+      maxId = parseInt(lastCustomer.CUST_ID.substring(1), 10) || 0;
+    }
+    const newId = 'C' + String(maxId + 1).padStart(3, '0');
 
-    await db.query(
-      'INSERT INTO CUSTOMER (CUST_ID,CUST_NAME,CUST_PHONE,CUST_EMAIL,CUST_ADDRESS,CUST_CITY,CUST_PASSWORD,REG_DATE) VALUES (?,?,?,?,?,?,?,CURDATE())',
-      [newId, CUST_NAME, CUST_PHONE, CUST_EMAIL, CUST_ADDRESS || '', CUST_CITY || '', CUST_PASSWORD]
-    );
-    res.status(201).json({ success: true, message: 'Customer registered', data: { CUST_ID: newId, CUST_NAME, CUST_EMAIL } });
+    // Create the customer document in MongoDB
+    const newCustomer = await Customer.create({
+      CUST_ID: newId,
+      CUST_NAME,
+      CUST_PHONE,
+      CUST_EMAIL,
+      CUST_ADDRESS: CUST_ADDRESS || '',
+      CUST_CITY: CUST_CITY || '',
+      CUST_PASSWORD,
+      REG_DATE: new Date(),
+      IS_ACTIVE: 1
+    });
+
+    res.status(201).json({ 
+      success: true, 
+      message: 'Customer registered', 
+      data: { CUST_ID: newId, CUST_NAME, CUST_EMAIL } 
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -54,10 +73,12 @@ exports.registerCustomer = async (req, res) => {
 exports.loginCustomer = async (req, res) => {
   const { CUST_EMAIL, CUST_PASSWORD } = req.body;
   try {
-    const [[cust]] = await db.query(
-      'SELECT CUST_ID,CUST_NAME,CUST_EMAIL,CUST_PHONE,CUST_CITY FROM CUSTOMER WHERE CUST_EMAIL=? AND CUST_PASSWORD=? AND IS_ACTIVE=1',
-      [CUST_EMAIL, CUST_PASSWORD]
-    );
+    const cust = await Customer.findOne({ 
+      CUST_EMAIL, 
+      CUST_PASSWORD, 
+      IS_ACTIVE: 1 
+    }).select('CUST_ID CUST_NAME CUST_EMAIL CUST_PHONE CUST_CITY');
+
     if (!cust) return res.status(401).json({ success: false, message: 'Invalid credentials' });
     res.json({ success: true, message: 'Login successful', data: cust });
   } catch (err) {
@@ -69,10 +90,13 @@ exports.loginCustomer = async (req, res) => {
 exports.updateCustomer = async (req, res) => {
   const { CUST_NAME, CUST_PHONE, CUST_ADDRESS, CUST_CITY } = req.body;
   try {
-    await db.query(
-      'UPDATE CUSTOMER SET CUST_NAME=?,CUST_PHONE=?,CUST_ADDRESS=?,CUST_CITY=? WHERE CUST_ID=?',
-      [CUST_NAME, CUST_PHONE, CUST_ADDRESS, CUST_CITY, req.params.id]
+    const result = await Customer.findOneAndUpdate(
+      { CUST_ID: req.params.id },
+      { $set: { CUST_NAME, CUST_PHONE, CUST_ADDRESS, CUST_CITY } },
+      { new: true }
     );
+    
+    if (!result) return res.status(404).json({ success: false, message: 'Customer not found' });
     res.json({ success: true, message: 'Customer updated' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -82,7 +106,12 @@ exports.updateCustomer = async (req, res) => {
 // DELETE customer
 exports.deleteCustomer = async (req, res) => {
   try {
-    await db.query('UPDATE CUSTOMER SET IS_ACTIVE=0 WHERE CUST_ID=?', [req.params.id]);
+    const result = await Customer.findOneAndUpdate(
+      { CUST_ID: req.params.id },
+      { $set: { IS_ACTIVE: 0 } }
+    );
+
+    if (!result) return res.status(404).json({ success: false, message: 'Customer not found' });
     res.json({ success: true, message: 'Customer deactivated' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -92,19 +121,9 @@ exports.deleteCustomer = async (req, res) => {
 // GET customer booking history
 exports.getCustomerHistory = async (req, res) => {
   try {
-    const [rows] = await db.query(
-      `SELECT R.*, D.DRIVER_NAME, D.VEHICLE_NO, D.VEHICLE_TYPE,
-              P.PAYMENT_STATUS, P.PAYMENT_METHOD,
-              F.RATING, F.COMMENTS
-       FROM RIDE R
-       LEFT JOIN DRIVER  D ON R.DRIVER_ID = D.DRIVER_ID
-       LEFT JOIN PAYMENT P ON R.RIDE_ID   = P.RIDE_ID
-       LEFT JOIN FEEDBACK F ON R.RIDE_ID  = F.RIDE_ID
-       WHERE R.CUST_ID = ?
-       ORDER BY R.REQUEST_TIME DESC`,
-      [req.params.id]
-    );
-    res.json({ success: true, data: rows });
+    // Returning an empty array for now to prevent frontend dashboard crashes 
+    // until your Ride, Driver, and Feedback models are also migrated to MongoDB
+    res.json({ success: true, data: [] });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
