@@ -669,3 +669,82 @@ a:hover { text-decoration: underline; }
   .success-icon { font-size: 48px; }
   .success-title { font-size: 1.2rem; }
 }
+
+
+/* ============================================================
+   Video Background & Split-Screen Login
+   ============================================================ */
+.login-split-card {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  max-width: 920px;
+  min-height: 540px;
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+  border: 1px solid var(--s200);
+}
+
+.login-split-video {
+  flex: 1 1 50%;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justifyContent: flex-end;
+  padding: 40px;
+  color: #ffffff;
+  min-height: 300px;
+}
+
+.login-split-video video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: none;
+}
+
+.login-split-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 45%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.login-split-content {
+  position: relative;
+  z-index: 2;
+}
+
+.login-split-form {
+  flex: 1 1 50%;
+  padding: 44px 38px;
+  display: flex;
+  flex-direction: column;
+  justifyContent: center;
+  background: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .login-split-card {
+    flex-direction: column;
+    max-width: 440px;
+  }
+  .login-split-video {
+    min-height: 220px;
+    padding: 24px 20px;
+  }
+  .login-split-form {
+    padding: 28px 20px;
+  }
+}
